@@ -1,0 +1,44 @@
+# The AimDB data contracts live demo: the computer page with the hub and a
+# simulated fleet, and the node page a visitor opens on a phone. See
+# README.md and DESIGN.md.
+[workspace]
+members = [
+    "contracts/r1",
+    "contracts/r2",
+    "contracts/exhibits/v3",
+    "contracts/exhibits/unbumped",
+    "protocol",
+    "page-connector",
+    "graphs",
+    "web",
+    "node-web",
+    "tools/contracts-json",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+# AimDB is pinned by git revision until a release contains 062 and 063.
+# For local work against a checkout, patch in .cargo/config.toml (ignored).
+aimdb-core = { git = "https://github.com/aimdb-dev/aimdb.git", rev = "2036ae1", default-features = false }
+aimdb-data-contracts = { git = "https://github.com/aimdb-dev/aimdb.git", rev = "2036ae1", default-features = false }
+aimdb-wasm-adapter = { git = "https://github.com/aimdb-dev/aimdb.git", rev = "2036ae1", default-features = false }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+
+contracts-r1 = { path = "contracts/r1" }
+contracts-r2 = { path = "contracts/r2" }
+exhibit-v3 = { path = "contracts/exhibits/v3" }
+exhibit-unbumped = { path = "contracts/exhibits/unbumped" }
+line-protocol = { path = "protocol" }
+page-connector = { path = "page-connector" }
+live-graphs = { path = "graphs" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1

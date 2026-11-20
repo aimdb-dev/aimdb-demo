@@ -1,0 +1,7 @@
+# aimdb.lock: generated, do not edit. AIMDB_UPDATE_LOCK=1 cargo test to update.
+version = 1
+
+[[contract]]
+name = "power_reading"
+version = 3
+shape = "sha256:0b56c7a2c95358aff41b6d2aa0fbaff1fd5b7e063fc8fd71f94111c9a8ed9a2f"

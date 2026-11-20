@@ -1,0 +1,73 @@
+<!doctype html>
+<!-- A minimal node page on the node bundle (dist/pkg-node), opened from a
+     link on examples/hub.html:
+       examples/node.html?bus=<ws(s)://host/bus/<code>>&as=<1..8>
+     It sends one reading a second and shows the hub's answer to it. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AimDB Demo Node</title>
+<style>
+body{font:16px/1.5 system-ui,sans-serif;max-width:480px;margin:0 auto;padding:16px;color-scheme:light dark}
+pre{font:13px/1.5 ui-monospace,monospace;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<h1 id="title">Node</h1>
+<p>Link: <code id="link">loading…</code> · Hub: <span id="mode">contracts on</span></p>
+<p>
+  Firmware
+  <select id="fw"><option>v1</option><option selected>v2</option><option>v3</option><option>unbumped</option><option>none</option></select>
+</p>
+<p><input type="number" id="watts" value="326" min="0" max="65535"> W</p>
+<p><label><input type="checkbox" id="auto" checked> Send every second</label></p>
+<p id="sent"></p>
+<h2>The hub's answer</h2>
+<pre id="answer">—</pre>
+
+<script type="module">
+import init, { Node } from "../dist/pkg-node/node_web.js";
+
+const q = new URLSearchParams(location.search);
+const bus = q.get("bus"), place = q.get("as");
+if (!bus || !place) { document.getElementById("link").textContent = "open this page from a link on hub.html"; throw new Error("no bus"); }
+await init();
+const node = await Node.join(bus, place);
+window.node = node;  // for tests/e2e.py
+document.getElementById("title").textContent = `Node ${place}`;
+
+const fw = document.getElementById("fw");
+fw.onchange = () => node.flash(fw.value);
+
+// One reading a second, at the value in the box. The answer carries the
+// reading's seq, so it is shown next to the value it answers.
+const sent = new Map();
+setInterval(() => {
+  if (!document.getElementById("auto").checked || node.linkState() !== "Open") return;
+  const w = +document.getElementById("watts").value;
+  const seq = node.send(w);
+  sent.set(seq, w);
+  if (sent.size > 30) sent.delete(sent.keys().next().value);
+  document.getElementById("sent").textContent = `#${seq} sent · ${node.contracts() ? node.firmware() : "plain JSON"} · ${w} W`;
+}, 1000);
+
+// When the hub flips contracts, send the last reading again the new way.
+let on = node.contracts();
+setInterval(() => {
+  document.getElementById("link").textContent = node.linkState();
+  if (node.contracts() !== on) {
+    on = node.contracts();
+    document.getElementById("mode").textContent = on ? "contracts on" : "contracts off";
+    const seq = node.resend();
+    if (seq != null) sent.set(seq, sent.get(seq - 1));
+  }
+  const raw = node.feedback();
+  if (!raw) return;
+  const fb = JSON.parse(raw);
+  const w = sent.get(fb.seq);
+  document.getElementById("answer").textContent = `to #${fb.seq} (${w ?? "?"} W):\n` + JSON.stringify(fb, null, 2);
+}, 100);
+</script>
+</body>
+</html>

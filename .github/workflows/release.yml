@@ -1,0 +1,41 @@
+# Publishes the bundles as a GitHub release when a version tag is pushed:
+#
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# The release carries aimdb-demo-bundles-<tag>.tar.gz (scripts/package.sh)
+# and its .sha256. aimdb.dev's demo image pins a release by tag and checksum.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      WASM_BINDGEN_VERSION: 0.2.130
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - name: wasm-bindgen-cli
+        run: cargo install --locked wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION"
+      - name: Tests
+        run: cargo test --workspace --features live-graphs/hub
+      - name: Bundles
+        run: scripts/build.sh
+      - name: Package
+        run: scripts/package.sh "$GITHUB_REF_NAME"
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "aimdb-demo-bundles-$GITHUB_REF_NAME.tar.gz" \
+            "aimdb-demo-bundles-$GITHUB_REF_NAME.tar.gz.sha256" \
+            --title "$GITHUB_REF_NAME" \
+            --notes "Bundles for the AimDB data contracts demo: pkg/ (LiveHub, LocalNode), pkg-node/ (Node), contracts.json. See README.md, \"Releases\"."

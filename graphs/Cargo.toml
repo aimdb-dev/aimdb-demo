@@ -1,0 +1,39 @@
+[package]
+name = "live-graphs"
+description = "The live demo's AimDB graphs: the node gateway and the hub. The runtime is a type parameter."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+# The hub reads its admission counters through `AimDb::list_records`, which
+# needs AimX's data model and observability. The node bundle builds
+# without either.
+# The baseline receivers parse JSON.
+hub = ["aimdb-core/remote", "aimdb-core/observability", "dep:serde_json", "dep:serde"]
+wasm = ["dep:aimdb-wasm-adapter", "dep:wasm-bindgen-futures", "dep:futures-util", "dep:js-sys"]
+
+[dependencies]
+aimdb-core = { workspace = true, features = ["alloc", "connector-session"] }
+aimdb-data-contracts = { workspace = true, features = ["alloc", "migratable", "linkable-postcard"] }
+contracts-r1 = { workspace = true }
+contracts-r2 = { workspace = true }
+exhibit-v3 = { workspace = true }
+exhibit-unbumped = { workspace = true }
+page-connector = { workspace = true }
+aimdb-wasm-adapter = { workspace = true, optional = true, features = ["wasm-runtime"] }
+wasm-bindgen-futures = { version = "0.4", optional = true }
+futures-util = { version = "0.3", optional = true, default-features = false, features = ["alloc"] }
+js-sys = { version = "0.3", optional = true }
+serde_json = { version = "1", optional = true }
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+# The untyped baseline: the same readings as plain JSON, the way most
+# pipelines carry sensor values today.
+serde_json = "1"
+
+[[test]]
+name = "without_contracts"
+required-features = ["hub"]

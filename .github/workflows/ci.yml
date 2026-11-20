@@ -1,0 +1,48 @@
+# Tests on every push and pull request: the contracts and their locks, the
+# protocol, the baseline, the browser tests, and the example pages end to
+# end through bus-forwarder.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      # Must match wasm-bindgen in Cargo.lock.
+      WASM_BINDGEN_VERSION: 0.2.130
+    steps:
+      - uses: actions/checkout@v4
+      # rust-toolchain.toml selects the compiler and the targets.
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - name: wasm-bindgen-cli
+        run: cargo install --locked wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION"
+      - name: Format and lints
+        run: |
+          cargo fmt --all --check
+          cargo clippy --workspace --features live-graphs/hub --all-targets -- -D warnings
+      - name: Host tests (locks, migration, exhibits, protocol, baseline)
+        run: cargo test --workspace --features live-graphs/hub
+      - name: Contract crates build for a microcontroller
+        run: cargo check -p contracts-r2 -p exhibit-v3 -p exhibit-unbumped --target thumbv7em-none-eabihf
+      - name: Browser tests
+        env:
+          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER: wasm-bindgen-test-runner
+        run: |
+          export CHROMEDRIVER="$CHROMEWEBDRIVER/chromedriver"
+          cargo test --target wasm32-unknown-unknown -p live-web
+      - name: Bundles and the release tarball
+        run: |
+          scripts/build.sh
+          scripts/package.sh "ci-${GITHUB_SHA::7}"
+      - name: End to end on the example pages
+        run: |
+          export CHROMEDRIVER="$CHROMEWEBDRIVER/chromedriver"
+          python3 tests/e2e.py

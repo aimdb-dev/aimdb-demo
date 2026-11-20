@@ -1,0 +1,19 @@
+[package]
+name = "node-web"
+description = "The node page's WASM bundle: the node gateway and the /bus client, nothing else."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+# wasm32 only; on the host the crate is empty. No `hub` feature: the node
+# bundle carries neither the hub nor AimX remote access.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+live-graphs = { workspace = true, features = ["wasm"] }
+page-connector = { workspace = true }
+line-protocol = { workspace = true }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"

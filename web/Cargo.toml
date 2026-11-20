@@ -1,0 +1,29 @@
+[package]
+name = "live-web"
+description = "The computer page's WASM bundle: the hub, the on-page node and the simulated fleet's nodes."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+# wasm32 only; on the host the crate is empty.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+aimdb-core = { workspace = true, features = ["alloc", "remote", "connector-session"] }
+live-graphs = { workspace = true, features = ["wasm", "hub"] }
+page-connector = { workspace = true }
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+serde_json = "1"
+line-protocol = { workspace = true }
+wasm-bindgen-futures = "0.4"
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
+aimdb-wasm-adapter = { workspace = true, features = ["wasm-runtime"] }
+web-sys = { version = "0.3", features = ["Window"] }

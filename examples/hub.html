@@ -1,0 +1,100 @@
+<!doctype html>
+<!-- A minimal hub page on the demo's bundles (dist/pkg). Plain on purpose:
+     no branding, no simulated fleet, no graph. aimdb.dev's live demo is a
+     dressed-up page on the same bundles.
+       examples/hub.html                    joins ws://<this host>:9312/bus/<code> (bus-forwarder)
+       examples/hub.html?bus=<ws(s)://…/bus>  joins that bus
+       examples/hub.html?code=<code>        a fixed code instead of a random one
+       examples/hub.html?local              no bus: the on-page node only -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AimDB Demo Hub</title>
+<style>
+body{font:15px/1.5 system-ui,sans-serif;max-width:900px;margin:0 auto;padding:16px;color-scheme:light dark}
+code,pre,td{font-family:ui-monospace,monospace;font-size:13px}
+table{border-collapse:collapse;width:100%}
+th,td{text-align:left;padding:3px 8px;border-bottom:1px solid #8884}
+.ok{color:#1a7f5a} .no{color:#c0392b} .raw{color:#8a6d00}
+</style>
+</head>
+<body>
+<h1>Hub</h1>
+<p>This hub knows <code>power_reading</code> @1 and @2. Every verdict below is AimDB's own admission result, read from the hub's route counters.</p>
+<p>Bus: <code id="link">starting…</code></p>
+<p><label><input type="checkbox" id="contracts" checked> Data contracts on</label>
+  (off: nodes send plain JSON, nothing is checked, three ordinary receivers read it)</p>
+
+<h2>Join as a node</h2>
+<ol id="places"></ol>
+
+<h2>Send from here</h2>
+<p>
+  <select id="fw"><option>v1</option><option selected>v2</option><option>v3</option><option>unbumped</option><option>none</option></select>
+  <input type="number" id="watts" value="326" min="0" max="65535"> W
+  <button id="send">Send</button>
+</p>
+
+<h2>Counts</h2>
+<pre id="counts"></pre>
+
+<h2>Messages, newest first</h2>
+<table>
+  <thead><tr><th>from</th><th>on the wire</th><th>the hub</th></tr></thead>
+  <tbody id="log"></tbody>
+</table>
+
+<script type="module">
+import init, { LiveHub } from "../dist/pkg/live_web.js";
+
+const q = new URLSearchParams(location.search);
+const local = q.has("local");
+const bus = q.get("bus") ?? (location.protocol === "https:" ? `wss://${location.host}/bus` : `ws://${location.hostname}:9312/bus`);
+const code = q.get("code") ?? Array.from(crypto.getRandomValues(new Uint8Array(16)), b => "abcdefghijkmnopqrstuvwxyz23456789"[b % 33]).join("");
+
+await init();
+const hub = await LiveHub.start(local ? "" : `${bus}/${code}?as=hq`);
+const here = await hub.node("here");
+window.hub = hub;  // for tests/e2e.py
+
+// One link per place. The node page joins the same bus as that place.
+const places = document.getElementById("places");
+if (local) places.innerHTML = "<li>No bus (?local): only the on-page node.</li>";
+else for (let n = 1; n <= LiveHub.nodePlaces(); n++) {
+  const url = new URL("node.html", location.href);
+  url.search = new URLSearchParams({ bus: `${bus}/${code}`, as: String(n) }).toString();
+  places.insertAdjacentHTML("beforeend", `<li><a href="${url.href}" target="_blank" data-place="${n}">node ${n}</a></li>`);
+}
+
+const fw = document.getElementById("fw");
+fw.onchange = () => here.flash(fw.value);
+document.getElementById("send").onclick = () => here.send(+document.getElementById("watts").value);
+const contracts = document.getElementById("contracts");
+contracts.onchange = () => { hub.setContracts(contracts.checked); here.resend(); };
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const W = n => n == null ? "NULL" : `${n} W`;
+let shown = -1;
+setInterval(() => {
+  const v = hub.view();
+  window.lastView = v;
+  document.getElementById("link").textContent = local ? "none (local)" : `${bus}/${code} · ${v.link}`;
+  contracts.checked = v.contracts;
+  const c = v.counts;
+  document.getElementById("counts").textContent = v.contracts
+    ? `admitted ${c.accepted - c.upgraded} · migrated ${c.upgraded} · too_new ${c.too_new} · shape_mismatch ${c.shape_mismatch} · malformed ${c.malformed}`
+    : `contracts off: read ${v.raw.read}, the three receivers disagreed on ${v.raw.disagree}`;
+  if (v.frames_total === shown) return;
+  shown = v.frames_total;
+  document.getElementById("log").innerHTML = v.frames.map(f => {
+    const wire = f.readings ? "plain JSON" : f.contract ? `${f.contract} @${f.version} · ${f.field ?? "?"} ${f.number ?? ""}` : `no contract · ${f.text ?? f.bytes + " bytes"}`;
+    const hubSays = f.readings
+      ? `<span class="raw">dashboard ${W(f.readings.dashboard)} · analytics ${W(f.readings.told)} · data lake ${W(f.readings.lenient)}</span>`
+      : `<span class="${f.verdict === "accepted" || f.verdict === "upgraded" ? "ok" : "no"}">${f.verdict ?? "no route"}</span>`;
+    return `<tr><td>${esc(f.kind)} ${esc(f.place)}</td><td>${esc(wire)}</td><td>${hubSays}</td></tr>`;
+  }).join("");
+}, 200);
+</script>
+</body>
+</html>

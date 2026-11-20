@@ -1,0 +1,6 @@
+# The same compiler as the pinned aimdb revision.
+[toolchain]
+channel = "1.98.0"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
+targets = ["thumbv7em-none-eabihf", "wasm32-unknown-unknown"]
